@@ -13,7 +13,7 @@ public class Result<T> {
         Result<T> res = new Result<>();
         res.setCode("200");
         res.setData(data);
-        return res; 
+        return res;
     }
 
     public static <T> Result<T> success() {
