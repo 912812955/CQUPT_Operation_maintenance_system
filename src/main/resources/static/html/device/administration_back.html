@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>后台管理</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../../layui/css/layui.css" media="all">
+    <link rel="stylesheet" href="../../css/message.css">
+</head>
+<link href="../../css/theme.css" rel="stylesheet" type="text/css"/>
+<body>
+<script src="../../js/jquery-3.6.0.min.js"></script>
+<script src="../../js/vue.min.js"></script>
+<script src="../../layui/layui.js"></script>
+<script src="../../js/message.min.js"></script>
+<script src="../../js/getAddress.js"></script>
+
+<div class="popupNrdiv" id="administration_back">
+
+    <!-- 常用语句查询 -->
+    <script src="../../js/administration_back/administration_back_search.js"></script>
+
+    <!--操作台-->
+    <script src="../../js/administration_back/administration_back_operation.js"></script>
+
+    <!-- 查询结果 -->
+    <script src="../../js/administration_back/administration_back_result.js"></script>
+
+</div>
+
+<!--由于vue和layui冲突无法双向绑定，故在此手动获取表单数据-->
+<script>
+    layui.use(['form'], function () {
+        layui.form.on('select(form_type)', function (data) {
+            Common.type = data.value
+        })
+        layui.form.on('select(form_distract)', function (data) {
+            Common.distract = data.value
+        })
+        layui.form.on('select(form_alias)', function (data) {
+            Common.alias = data.value
+        })
+        Common.getFormValue()
+    })
+</script>
+
+<script>
+    var Common = new Vue({
+        el: '#administration_back',
+        data: {
+            type: '',
+            distract: '',
+            alias: '',
+            sql: '',
+            address: "/Common/selectCommonAll"
+        },
+        updated: function () {
+            layui.use('form', function () {
+                layui.form.render('select');
+            })
+        },
+        methods: {
+            //重置选中项
+            reset() {
+                this.type = ''
+                this.distract = ''
+                this.alias = ''
+            },
+            //常用语句查询
+            select() {
+                fetch(this.address, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({sqlType: this.type, distract: this.distract, alias: this.alias})
+                })
+                    .then(res => res.json())
+                    .then(res => {
+                        console.log(res.data)
+                        console.log(location.host)
+                        if (res.data[0] != null && res.data[0]!== '') {
+                            $.message({message: "查询成功！", type: 'success'})
+                            var length = res.data.length
+                            var Data = ""
+                            if (length === 1) {
+                                Data = (res.data[0].sql)
+                            } else {
+                                for (var i = 0; i < length; i++) {
+                                    if (i !== (length - 1)) {
+                                        Data += (res.data[i].alias + ':' + '\r' + res.data[i].sql + '\r\r')
+                                    } else {
+                                        Data += (res.data[i].alias + ':' + '\r' + res.data[i].sql)
+                                    }
+                                }
+                            }
+                            this.sql = Data
+                        } else {
+                            $.message({message: "没有查询到结果，请检查查询条件！", type: 'warning'})
+                            this.sql = ''
+                        }
+
+                    })
+            },
+            //从数据库获取下拉框数据
+            getFormValue() {
+                fetch("/Common/all", {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+                    .then(res => res.json())
+                    .then(res => {
+                        layui.use(['table', 'form', 'layer'], function () {
+                            let form = layui.form, $ = layui.jquery;
+                            for (var i = 0; i < res.data.length; i++) {
+                                $('#alias').append(new Option(res.data[i].alias, res.data[i].alias));
+                                // 重新渲染下拉框
+                                form.render('select');
+                            }
+                        })
+                    })
+            },
+        }
+    })
+</script>
+
+<script type="text/html" id="toolbarDemo">
+    <div class="layui-btn-container">
+        <button class="layui-btn layui-btn-sm" lay-event="getCheckData" style="background-color: #016946;">获取选中行数据
+        </button>
+    </div>
+</script>
+
+<!--弹出层-->
+<script>
+    function submitCommon() {
+        var layer = layui.layer;
+        layer.open({
+            title: '操作面板',
+            type: 2,
+            area: ['500px', '330px'],
+            content: 'popupWindow_insert.html',
+            scrollbar: false,
+            success: function (layero, index) {
+                // 获取子页面的iframe
+                var iframe = window['layui-layer-iframe' + index];
+                // 向子页面的全局函数child传参
+                iframe.child(Common.sql);
+            }
+        });
+    }
+</script>
+
+<!--更新表内容-->
+<script>
+    window.getTable = function (res) {
+        layui.use(['jquery', 'layer', 'table'], function () {
+            table.render({
+                elem: '#table_Arbitrary'
+                , id: 'table_Arbitrary'
+                , toolbar: '#toolbarDemo'
+                , cols: getColsName(res.data[0])
+                , data: res.data
+                , page: true
+            });
+        });
+        //头工具栏事件
+        table.on('toolbar(table_Arbitrary)', function (obj) {
+            var checkStatus = table.checkStatus(obj.config.id); //获取选中行状态
+            switch (obj.event) {
+                case 'getCheckData':
+                    var data = checkStatus.data;  //获取选中行数据
+                    layer.alert(JSON.stringify(data));
+                    break;
+            }
+        });
+    }
+</script>
+
+<!--通过回传数据获取表头cols-->
+<script>
+    function getColsName(data) {
+        let col = []
+        let cols = []
+        col.push({checkbox: true, fixed: true})
+        for (var i in data) {
+            col.push({field: i, title: i})
+        }
+        cols.push(col)
+        return cols
+    }
+</script>
+
+</body>
+</html>
